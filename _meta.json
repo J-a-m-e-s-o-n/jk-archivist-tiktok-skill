@@ -1,0 +1,5 @@
+{
+  "name": "jk-archivist-tiktok-skill",
+  "version": "0.1.0",
+  "description": "Generate 6-slide TikTok intro slideshow + caption and optionally upload as TikTok SELF_ONLY draft via Postiz."
+}
