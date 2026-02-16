@@ -26,3 +26,23 @@ node scripts/tiktok-intro-draft.mjs
 When implemented, outputs will be written under:
 
 - `outbox/tiktok/intro/YYYY-MM-DD/`
+
+## Phase 2 local dev (slides only)
+
+Install Pillow:
+
+```bash
+python3 -m pip install pillow
+```
+
+Render slides locally:
+
+```bash
+python3 scripts/render_slides_pillow.py --spec outbox/_tmp_slide_spec.json --out outbox/_tmp_slides --font /absolute/path/to/font.ttf
+```
+
+Verify generated slides:
+
+```bash
+python3 scripts/verify_slides.py --dir outbox/_tmp_slides
+```
