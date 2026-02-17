@@ -26,5 +26,5 @@ test("todayISO returns local YYYY-MM-DD", () => {
 test("topic mode generates deterministic six lines", () => {
   const slides = generateSlidesFromTopic("Collector confidence");
   assert.equal(slides.length, 6);
-  assert.equal(slides[0], "Collector confidence: the current state is noisier than it looks.");
+  assert.equal(slides[0], "Collector confidence: why this matters now.");
 });

@@ -1,5 +1,3 @@
-import fs from "node:fs";
-
 export const DEFAULT_SLIDES = [
   "The trading card market runs on messy data.",
   "Prices fragment. Condition drifts. Signals lie.",
@@ -9,7 +7,42 @@ export const DEFAULT_SLIDES = [
   "Alpha today. Compounding weekly. Brick by brick. 👑🧱",
 ];
 
-function validateSlides(slides, sourceLabel) {
+const TEMPLATE_BUILDERS = {
+  intro: (topic) => [
+    `${topic}: why this matters now.`,
+    "Most people see polished outputs and miss the messy middle.",
+    "Without structure, important signals get lost in noise.",
+    `${topic}: turned into a clear, practical narrative.`,
+    "Each slide does one job: inform, connect, and move forward.",
+    "Start simple, publish consistently, and improve every cycle.",
+  ],
+  educational: (topic) => [
+    `${topic}: the core idea in 6 steps.`,
+    "Step 1: define the problem in plain language.",
+    "Step 2: identify the common mistake people make.",
+    "Step 3: show the practical framework that works.",
+    "Step 4: apply it to a real-world example.",
+    "Step 5: summarize the takeaway and next action.",
+  ],
+  "product-update": (topic) => [
+    `${topic}: what changed this week.`,
+    "New capability: faster workflow for repeatable output.",
+    "Quality upgrade: stronger validation before publish.",
+    "Reliability upgrade: deterministic rendering and checks.",
+    "User impact: less manual effort, clearer results.",
+    "Next: iterate with feedback and ship improvements.",
+  ],
+  announcement: (topic) => [
+    `${topic}: official announcement.`,
+    "What is launching and who it is for.",
+    "What problem this solves right now.",
+    "What users can expect from day one.",
+    "How to get started in under 5 minutes.",
+    "Follow for updates as we roll out improvements.",
+  ],
+};
+
+export function validateSlides(slides, sourceLabel) {
   if (!Array.isArray(slides)) {
     throw new Error(`${sourceLabel} must provide a 'slides' array.`);
   }
@@ -24,18 +57,18 @@ function validateSlides(slides, sourceLabel) {
   return slides.map((line) => line.trim());
 }
 
-export function loadSlidesFromSpecFile(specPath) {
-  if (!fs.existsSync(specPath)) {
-    throw new Error(`Slide spec file not found: ${specPath}`);
+export function listTemplates() {
+  return Object.keys(TEMPLATE_BUILDERS);
+}
+
+export function generateSlidesFromTemplate(templateName, topic = "Your topic") {
+  const builder = TEMPLATE_BUILDERS[templateName];
+  if (!builder) {
+    throw new Error(
+      `Unknown template '${templateName}'. Allowed: ${listTemplates().join(", ")}`
+    );
   }
-  let parsed;
-  try {
-    parsed = JSON.parse(fs.readFileSync(specPath, "utf8"));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Could not parse slide spec JSON: ${message}`);
-  }
-  return validateSlides(parsed.slides, `Spec (${specPath})`);
+  return validateSlides(builder(topic.trim() || "Your topic"), `Template (${templateName})`);
 }
 
 export function generateSlidesFromTopic(topic) {
@@ -43,23 +76,11 @@ export function generateSlidesFromTopic(topic) {
   if (!cleanTopic) {
     throw new Error("Topic cannot be empty when generating custom slides.");
   }
-  // Deterministic template for agent-assisted "come up with 6 slides" mode.
-  return [
-    `${cleanTopic}: the current state is noisier than it looks.`,
-    "Signals conflict. Context is fragmented. Surface-level takes miss nuance.",
-    "People still need to make decisions with imperfect information.",
-    `${cleanTopic}: distilled into a usable, plain-English narrative.`,
-    "Start with verified facts. Remove noise. Keep the message actionable.",
-    "Publish consistently, learn weekly, and compound clarity over time.",
-  ];
+  return generateSlidesFromTemplate("intro", cleanTopic);
 }
 
-export function resolveSlides({ specPath, topic }) {
-  if (specPath) {
-    return loadSlidesFromSpecFile(specPath);
-  }
-  if (topic) {
-    return generateSlidesFromTopic(topic);
-  }
-  return [...DEFAULT_SLIDES];
+export function resolveSlides({ topic, template = "intro" }) {
+  if (topic) return generateSlidesFromTopic(topic);
+  if (template) return generateSlidesFromTemplate(template, "Your topic");
+  return validateSlides([...DEFAULT_SLIDES], "Default slides");
 }

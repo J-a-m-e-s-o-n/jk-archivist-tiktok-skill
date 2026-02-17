@@ -1,5 +1,13 @@
 # jk-archivist-tiktok-skill
 
+## Start Here
+
+For the current, complete user guide (all modes, flags, Postiz options, and packaging commands), use:
+
+- `skills/jk-archivist-tiktok-skill/README.md`
+
+This root README is a high-level repository overview.
+
 ## What this repo does
 
 Generates a deterministic 6-slide TikTok intro slideshow plus caption from a contract-first skill definition. The current implementation covers local rendering + verification + outbox writing. Postiz upload/draft creation remains Phase 4.
@@ -49,6 +57,7 @@ Optional local font override:
 ## Run
 
 ```bash
+cd skills/jk-archivist-tiktok-skill
 node scripts/tiktok-intro-draft.mjs
 ```
 

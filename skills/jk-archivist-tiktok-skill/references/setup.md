@@ -39,6 +39,12 @@ Generate copy from a topic (deterministic template):
 node scripts/tiktok-intro-draft.mjs --topic "your topic"
 ```
 
+Choose template/style:
+
+```bash
+node scripts/tiktok-intro-draft.mjs --template educational --style clean
+```
+
 ## Optional Postiz mode
 
 Set:

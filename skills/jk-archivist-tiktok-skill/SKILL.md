@@ -43,6 +43,14 @@ Custom input modes:
 - Optional Postiz draft upload:
   - `node scripts/tiktok-intro-draft.mjs --postiz`
 
+Advanced modes:
+
+- `--template intro|educational|product-update|announcement`
+- `--style default|high-contrast|clean|midnight`
+- `--dry-run` (write spec/review only, skip render/upload)
+- `--postiz-only` (reuse existing rendered slides, upload only)
+- `--no-upload` (force local-only even with `--postiz`)
+
 ## Core Output Contract
 
 - Exactly 6 slides
@@ -87,6 +95,18 @@ Spec format:
 }
 ```
 
+### Customization Matrix
+
+| Need | Option |
+|---|---|
+| Use your own exact slide copy | `--spec /path/spec.json` |
+| Generate deterministic copy from a topic | `--topic "your topic"` |
+| Use a built-in narrative structure | `--template educational` (or others) |
+| Change visual style | `--style high-contrast` |
+| Keep local-only output | run without `--postiz` or add `--no-upload` |
+| Upload optional draft via Postiz | `--postiz` with required env vars |
+| Validate pipeline without rendering/upload | `--dry-run` |
+
 ## Preset: JK Archivist Intro (Exact Contract)
 
 ### Objective
@@ -127,7 +147,9 @@ Follow if you want collector-first market intelligence. 👑🧱
 ## References
 
 - `references/setup.md`
+- `references/spec-schema.md`
 - `references/renderer-spec.md`
 - `references/outputs-and-validation.md`
 - `references/troubleshooting.md`
+- `references/publish-checklist.md`
 - `examples/sample-slide-spec.json`

@@ -7,6 +7,8 @@ outbox/tiktok/intro/YYYY-MM-DD/
   _slide_spec.json
   slides/slide_01.png ... slide_06.png
   caption.txt
+  review/review.md
+  review/contact_sheet.png
   postiz_response.json (optional, when --postiz is used)
 ```
 
@@ -31,3 +33,7 @@ npm test
 
 - Node tests validate caption + slide contract constants
 - Python tests validate spec loader and verification constants
+
+## Dry-run behavior
+
+`--dry-run` writes spec and review metadata, then skips render/upload steps.

@@ -2,11 +2,15 @@
 
 ## What this skill does
 
-Creates deterministic TikTok intro assets:
+Creates deterministic TikTok slideshow assets:
 
 - 6 PNG slides (`1024x1536`)
-- exact caption contract text
+- custom or template-driven slide copy
+- caption generation (default contract, overridable via spec)
 - output verification for slide names and dimensions
+- preflight policy checks
+- review artifacts (`review.md` + contact sheet)
+- optional Postiz draft upload
 
 ## Install dependencies
 
@@ -16,15 +20,15 @@ python3 -m pip install -r requirements.txt
 
 ## Run
 
+Default preset mode:
+
 ```bash
 node scripts/tiktok-intro-draft.mjs
 ```
 
-Optional font override:
+## Input modes
 
-- `TIKTOK_FONT_PATH` (absolute `.ttf` path)
-
-Use custom 6-slide copy:
+Use custom 6-slide copy from JSON spec:
 
 ```bash
 node scripts/tiktok-intro-draft.mjs --spec /absolute/path/to/spec.json
@@ -36,26 +40,82 @@ Generate deterministic slide copy from a topic:
 node scripts/tiktok-intro-draft.mjs --topic "your topic"
 ```
 
-Optional Postiz draft upload (requires env vars):
+Use built-in narrative template:
+
+```bash
+node scripts/tiktok-intro-draft.mjs --template educational
+```
+
+Choose visual style:
+
+```bash
+node scripts/tiktok-intro-draft.mjs --style high-contrast
+```
+
+Template options:
+
+- `intro`
+- `educational`
+- `product-update`
+- `announcement`
+
+Style options:
+
+- `default`
+- `high-contrast`
+- `clean`
+- `midnight`
+
+### CLI precedence
+
+Input resolution order is:
+
+1. `--spec`
+2. `--topic`
+3. `--template`
+4. bundled preset copy
+
+Other run modes:
+
+- `--dry-run` (write spec/review metadata only; skip render/upload)
+- `--postiz-only` (reuse existing rendered slides; upload path only)
+- `--no-upload` (force local-only run even when `--postiz` is present)
+
+## Optional Postiz upload
+
+Enable optional draft upload:
 
 ```bash
 node scripts/tiktok-intro-draft.mjs --postiz
 ```
 
+Required env vars:
+
+- `POSTIZ_API_KEY`
+- `POSTIZ_TIKTOK_INTEGRATION_ID`
+
+Optional env vars:
+
+- `POSTIZ_BASE_URL` (default: `https://api.postiz.com/public/v1`)
+- `TIKTOK_FONT_PATH` (absolute `.ttf` path)
+
 ## Output
 
 ```text
 outbox/tiktok/intro/YYYY-MM-DD/
-  slides/slide_01.png ... slide_06.png
-  caption.txt
   _slide_spec.json
+  caption.txt
+  slides/slide_01.png ... slide_06.png
+  review/review.md
+  review/contact_sheet.png
+  postiz_response.json (optional, when --postiz succeeds)
 ```
 
 ## Validation
 
 ```bash
 npm test
-python3 scripts/verify_slides.py --dir outbox/_tmp_slides
+python3 scripts/verify_slides.py --dir outbox/tiktok/intro/YYYY-MM-DD/slides
 ```
 
 ## Publish Checklist
@@ -64,10 +124,44 @@ python3 scripts/verify_slides.py --dir outbox/_tmp_slides
 - no secrets committed (`.env`, API keys)
 - `node scripts/tiktok-intro-draft.mjs` succeeds
 - `npm test` succeeds
-- contract copy in slides/caption remains exact
+- `npm run validate:bundle` succeeds
 
-## Optional Postiz Env Vars
+Bundle utility commands (recommended before ClawHub upload):
 
-- `POSTIZ_BASE_URL` (default: `https://api.postiz.com/public/v1`)
-- `POSTIZ_API_KEY`
-- `POSTIZ_TIKTOK_INTEGRATION_ID`
+```bash
+npm run validate:bundle
+npm run pack
+```
+
+This writes:
+
+- `dist/jk-archivist-tiktok-skill.zip`
+
+## Spec example
+
+```json
+{
+  "slides": [
+    "Slide line 1",
+    "Slide line 2",
+    "Slide line 3",
+    "Slide line 4",
+    "Slide line 5",
+    "Slide line 6"
+  ],
+  "caption": "Optional custom caption",
+  "template": "intro",
+  "style": {
+    "preset": "default"
+  }
+}
+```
+
+See also:
+
+- `SKILL.md`
+- `references/spec-schema.md`
+- `references/setup.md`
+- `references/outputs-and-validation.md`
+- `references/troubleshooting.md`
+- `references/publish-checklist.md`

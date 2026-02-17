@@ -24,7 +24,22 @@ function extractUploadedMediaRef(json) {
   return value;
 }
 
-export async function postizUpload({ filePath, mimeType = "image/png" }) {
+async function sleep(ms) {
+  await new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function shouldRetry(status) {
+  return [429, 500, 502, 503, 504].includes(status);
+}
+
+export async function postizUpload({
+  filePath,
+  mimeType = "image/png",
+  timeoutMs = 15000,
+  maxAttempts = 3,
+}) {
   const baseUrl = normalizeBaseUrl(
     process.env.POSTIZ_BASE_URL || "https://api.postiz.com/public/v1"
   );
@@ -35,25 +50,49 @@ export async function postizUpload({ filePath, mimeType = "image/png" }) {
   }
 
   const fileBuffer = fs.readFileSync(filePath);
-  const form = new FormData();
-  form.append("file", new Blob([fileBuffer], { type: mimeType }), basename(filePath));
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const form = new FormData();
+    form.append("file", new Blob([fileBuffer], { type: mimeType }), basename(filePath));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(`${baseUrl}/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: apiKey,
+        },
+        body: form,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
 
-  const response = await fetch(`${baseUrl}/upload`, {
-    method: "POST",
-    headers: {
-      Authorization: apiKey,
-    },
-    body: form,
-  });
+      if (!response.ok) {
+        const body = await response.text();
+        const err = new Error(`Postiz upload failed (${response.status}): ${body}`);
+        if (attempt < maxAttempts && shouldRetry(response.status)) {
+          await sleep(400 * attempt);
+          lastError = err;
+          continue;
+        }
+        throw err;
+      }
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Postiz upload failed (${response.status}): ${body}`);
+      const json = await response.json();
+      return {
+        mediaRef: extractUploadedMediaRef(json),
+        raw: json,
+        attempt,
+      };
+    } catch (error) {
+      clearTimeout(timer);
+      lastError = error;
+      if (attempt >= maxAttempts) {
+        break;
+      }
+      await sleep(400 * attempt);
+    }
   }
-
-  const json = await response.json();
-  return {
-    mediaRef: extractUploadedMediaRef(json),
-    raw: json,
-  };
+  const message = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(`Postiz upload failed after ${maxAttempts} attempts: ${message}`);
 }

@@ -4,7 +4,12 @@ function normalizeBaseUrl(rawUrl) {
   return rawUrl.replace(/\/+$/, "");
 }
 
-export async function postizCreateDraft({ caption, mediaRefs }) {
+export async function postizCreateDraft({
+  caption,
+  mediaRefs,
+  timeoutMs = 15000,
+  idempotencyKey,
+}) {
   const baseUrl = normalizeBaseUrl(
     process.env.POSTIZ_BASE_URL || "https://api.postiz.com/public/v1"
   );
@@ -23,19 +28,34 @@ export async function postizCreateDraft({ caption, mediaRefs }) {
     content_posting_method: "UPLOAD",
   };
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const response = await fetch(`${baseUrl}/posts`, {
     method: "POST",
     headers: {
       Authorization: apiKey,
       "Content-Type": "application/json",
+      ...(idempotencyKey
+        ? {
+            "Idempotency-Key": idempotencyKey,
+          }
+        : {}),
     },
     body: JSON.stringify(payload),
+    signal: controller.signal,
   });
+  clearTimeout(timer);
 
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`Postiz draft creation failed (${response.status}): ${body}`);
   }
 
-  return response.json();
+  const json = await response.json();
+  return {
+    request: payload,
+    response: json,
+    postId: json?.id || json?.data?.id || json?.result?.id || null,
+    status: json?.status || json?.data?.status || json?.result?.status || "unknown",
+  };
 }
