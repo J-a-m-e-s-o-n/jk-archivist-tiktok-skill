@@ -22,6 +22,8 @@ python3 -m pip install -r requirements.txt
 .
 ├── SKILL.md
 ├── _meta.json
+├── skills/
+│   └── jk-archivist-tiktok-skill/   # ClawHub-ready standalone bundle
 ├── scripts/           # stable CLI wrappers
 ├── src/
 │   ├── node/          # Node orchestration + contract logic
@@ -82,6 +84,14 @@ npm test
 ## Architecture
 
 See `docs/ARCHITECTURE.md` for the flow from Node wrappers to Python modules.
+
+## ClawHub publish bundle
+
+The full publishable skill package lives in:
+
+- `skills/jk-archivist-tiktok-skill/`
+
+That directory is structured to be standalone-installable (contains `SKILL.md`, runtime code, references, tests, and manifests).
 
 ## Postiz (Phase 4)
 
