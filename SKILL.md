@@ -42,6 +42,9 @@ outbox/tiktok/intro/YYYY-MM-DD/
   postiz_response.json (optional)
 ```
 
+Execution Note
+- Current execution is manual delivery only (no Postiz auto‑upload). Draft upload via Postiz may be re‑enabled in a future phase.
+
 ## Never Do
 
 - No token mentions

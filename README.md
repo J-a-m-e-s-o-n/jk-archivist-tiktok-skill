@@ -31,6 +31,12 @@ python3 -m pip install -r requirements.txt
 node scripts/tiktok-intro-draft.mjs
 ```
 
+### Run Cheat Sheet (agent machine)
+- One-time: `python3 -m pip install pillow` (if not already installed via requirements)
+- Optional font: `export TIKTOK_FONT_PATH=/absolute/path/to/font.ttf`
+- Generate today’s bundle: `node scripts/tiktok-intro-draft.mjs`
+- Outputs: `outbox/tiktok/intro/YYYY-MM-DD/` with `slides/slide_01.png … slide_06.png`, `caption.txt`, `_slide_spec.json`
+
 ## Common Commands
 
 ```bash
