@@ -3,3 +3,5 @@ node_modules
 outbox
 *.log
 *.DS_Store
+__pycache__/
+.venv/

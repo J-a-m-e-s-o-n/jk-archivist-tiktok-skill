@@ -1,0 +1,13 @@
+{
+  "name": "jk-archivist-tiktok-skill",
+  "version": "0.1.0",
+  "description": "Generate deterministic TikTok intro slides and caption.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "run": "node scripts/tiktok-intro-draft.mjs",
+    "test:node": "node --test tests/node/*.test.mjs",
+    "test:python": "python3 -m unittest discover -s tests/python -p \"test_*.py\"",
+    "test": "npm run test:node && npm run test:python"
+  }
+}

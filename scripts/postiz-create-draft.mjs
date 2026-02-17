@@ -1,2 +1,1 @@
-// Creates a TikTok SELF_ONLY draft/private post via Postiz /posts.
-throw new Error("Not implemented");
+export { postizCreateDraft } from "../src/node/postiz-create-draft.mjs";
