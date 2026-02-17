@@ -27,29 +27,35 @@ class GoldenRenderTests(unittest.TestCase):
             spec = tmp_path / "spec.json"
             out_a = tmp_path / "a"
             out_b = tmp_path / "b"
-            spec.write_text(json.dumps({"slides": SLIDES}), encoding="utf-8")
+            styles = ["default", "clean", "high-contrast"]
+            for style in styles:
+                spec.write_text(
+                    json.dumps({"slides": SLIDES, "style": {"preset": style}}), encoding="utf-8"
+                )
 
-            font = Path("/System/Library/Fonts/Supplemental/Arial.ttf")
-            if not font.exists():
-                self.skipTest("System font not available for golden render test.")
+                font = Path("/System/Library/Fonts/Supplemental/Arial.ttf")
+                if not font.exists():
+                    self.skipTest("System font not available for golden render test.")
 
-            cmd = [
-                "python3",
-                "scripts/render_slides_pillow.py",
-                "--spec",
-                str(spec),
-                "--out",
-                str(out_a),
-                "--font",
-                str(font),
-            ]
-            subprocess.run(cmd, check=True)
-            cmd[5] = str(out_b)
-            subprocess.run(cmd, check=True)
+                cmd = [
+                    "python3",
+                    "scripts/render_slides_pillow.py",
+                    "--spec",
+                    str(spec),
+                    "--out",
+                    str(out_a),
+                    "--font",
+                    str(font),
+                ]
+                subprocess.run(cmd, check=True)
+                cmd[5] = str(out_b)
+                subprocess.run(cmd, check=True)
 
-            hash_a = sha256(out_a / "slide_01.png")
-            hash_b = sha256(out_b / "slide_01.png")
-            self.assertEqual(hash_a, hash_b)
+                for idx in range(1, 7):
+                    file_name = f"slide_{idx:02d}.png"
+                    hash_a = sha256(out_a / file_name)
+                    hash_b = sha256(out_b / file_name)
+                    self.assertEqual(hash_a, hash_b, msg=f"mismatch for {style} {file_name}")
 
 
 if __name__ == "__main__":

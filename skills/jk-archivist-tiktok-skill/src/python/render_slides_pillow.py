@@ -7,6 +7,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -260,12 +261,22 @@ def draw_slide_text(image: Image.Image, text: str, font_path: Path, style: Dict[
 
 def render_slides(slides: List[str], out_dir: Path, font_path: Path, style: Dict[str, object]) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
+    checksums: Dict[str, str] = {}
     for idx, slide_text in enumerate(slides, start=1):
         image = build_background(idx, style)
         draw_slide_text(image, slide_text, font_path, style)
         out_path = out_dir / f"slide_{idx:02d}.png"
         image.save(out_path, format="PNG", compress_level=9, optimize=False)
+        checksums[out_path.name] = hashlib.sha256(out_path.read_bytes()).hexdigest()
         print(f"Wrote {out_path}")
+    metadata_path = out_dir.parent / "_render_metadata.json"
+    metadata = {
+        "font_path": str(font_path),
+        "font_sha256": hashlib.sha256(font_path.read_bytes()).hexdigest(),
+        "style": style,
+        "checksums": checksums,
+    }
+    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> None:

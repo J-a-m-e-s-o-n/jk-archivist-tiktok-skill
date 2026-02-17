@@ -1,107 +1,113 @@
-# jk-archivist-tiktok-skill
+# TikTok Packager Skill
+
+Deterministic TikTok slideshow + caption packager for agents.  
+This repository is the source for the ClawHub/OpenClaw skill bundle in `skills/jk-archivist-tiktok-skill`.
 
 ## Start Here
 
-For the current, complete user guide (all modes, flags, Postiz options, and packaging commands), use:
+For the full end-user skill guide (all flags, examples, optional Postiz flow), read:
 
 - `skills/jk-archivist-tiktok-skill/README.md`
 
-This root README is a high-level repository overview.
+For the skill contract shown on ClawHub/OpenClaw:
 
-## What this repo does
+- `skills/jk-archivist-tiktok-skill/SKILL.md`
 
-Generates a deterministic 6-slide TikTok intro slideshow plus caption from a contract-first skill definition. The current implementation covers local rendering + verification + outbox writing. Postiz upload/draft creation remains Phase 4.
+## What It Does
 
-## Prereqs
+- Generates exactly 6 portrait PNG slides (`1024x1536`) deterministically
+- Builds caption text from preset or context-aware modes
+- Supports custom input via spec, topic, template, style, audience, and locale
+- Runs preflight policy checks before packaging
+- Produces review artifacts (`review.md` + contact sheet)
+- Optionally uploads draft posts through Postiz with retry/timeout handling
+- Produces clean release zips for SkillHub/ClawHub publishing
 
-- Node.js 20+
-- Python 3.10+
-- Pillow (installed via `requirements.txt`)
-
-Install dependencies:
-
-```bash
-python3 -m pip install -r requirements.txt
-```
-
-## Repository layout
-
-```text
-.
-├── SKILL.md
-├── _meta.json
-├── skills/
-│   └── jk-archivist-tiktok-skill/   # ClawHub-ready standalone bundle
-├── scripts/           # stable CLI wrappers
-├── src/
-│   ├── node/          # Node orchestration + contract logic
-│   └── python/        # Pillow renderer + verifier
-├── tests/
-│   ├── node/
-│   └── python/
-├── examples/
-├── tools/
-└── docs/
-```
-
-## Environment variables (for Postiz later)
-
-- `POSTIZ_BASE_URL` (default: `https://api.postiz.com/public/v1`)
-- `POSTIZ_API_KEY`
-- `POSTIZ_TIKTOK_INTEGRATION_ID`
-
-Optional local font override:
-
-- `TIKTOK_FONT_PATH` (absolute `.ttf` path)
-
-## Run
+## Quickstart
 
 ```bash
 cd skills/jk-archivist-tiktok-skill
+python3 -m pip install -r requirements.txt
 node scripts/tiktok-intro-draft.mjs
 ```
 
-## Outputs
-
-Current output path:
-
-- `outbox/tiktok/intro/YYYY-MM-DD/`
-- `outbox/tiktok/intro/YYYY-MM-DD/slides/slide_01.png` ... `slide_06.png`
-- `outbox/tiktok/intro/YYYY-MM-DD/caption.txt`
-- `outbox/tiktok/intro/YYYY-MM-DD/_slide_spec.json` (render input snapshot)
-
-## Local renderer + verifier commands
-
-Render only:
+## Common Commands
 
 ```bash
-python3 scripts/render_slides_pillow.py --spec examples/sample-slide-spec.json --out outbox/_tmp_slides --font /absolute/path/to/font.ttf
-```
-
-Verify slides:
-
-```bash
-python3 scripts/verify_slides.py --dir outbox/_tmp_slides
-```
-
-## Tests
-
-```bash
+# Tests
 npm test
+
+# Validate upload bundle cleanliness
+npm run validate:bundle
+
+# Build publish zip
+npm run pack
+
+# Release prep (version bump + test + pack)
+npm run release -- --version 1.2.0
 ```
 
-## Architecture
+## Main Runtime Modes
 
-See `docs/ARCHITECTURE.md` for the flow from Node wrappers to Python modules.
+From `skills/jk-archivist-tiktok-skill`:
 
-## ClawHub publish bundle
+```bash
+# Custom spec
+node scripts/tiktok-intro-draft.mjs --spec /absolute/path/to/spec.json
 
-The full publishable skill package lives in:
+# Topic -> deterministic slides
+node scripts/tiktok-intro-draft.mjs --topic "grading cards"
 
-- `skills/jk-archivist-tiktok-skill/`
+# Template + style + audience
+node scripts/tiktok-intro-draft.mjs --template educational --style clean --audience beginner
 
-That directory is structured to be standalone-installable (contains `SKILL.md`, runtime code, references, tests, and manifests).
+# A/B variants
+node scripts/tiktok-intro-draft.mjs --ab-test caption-cta
 
-## Postiz (Phase 4)
+# Optional Postiz draft upload
+node scripts/tiktok-intro-draft.mjs --postiz --resume-upload --max-retries 5 --timeout-ms 20000
+```
 
-Postiz upload and draft creation are intentionally deferred to Phase 4.
+## Output Structure
+
+```text
+outbox/tiktok/intro/YYYY-MM-DD/
+  _slide_spec.json
+  _render_metadata.json
+  caption.txt
+  slides/slide_01.png ... slide_06.png
+  review/review.md
+  review/contact_sheet.png
+  run_log.json
+  upload_state.json (optional)
+  postiz_response.json (optional)
+```
+
+## Repository Structure
+
+```text
+.
+├── skills/
+│   └── jk-archivist-tiktok-skill/   # publishable bundle
+├── scripts/                          # legacy wrappers at repo root
+├── src/                              # legacy source at repo root
+├── tests/
+├── docs/
+├── tools/
+├── README.md
+└── _meta.json
+```
+
+## Environment Variables
+
+- `TIKTOK_FONT_PATH` (optional absolute `.ttf` font)
+- `POSTIZ_BASE_URL` (optional, default `https://api.postiz.com/public/v1`)
+- `POSTIZ_API_KEY` (required for `--postiz`)
+- `POSTIZ_TIKTOK_INTEGRATION_ID` (required for `--postiz`)
+
+## Publishing Notes
+
+- SkillHub/ClawHub expects clean text/source bundles.
+- Always run `npm run validate:bundle` before `npm run pack`.
+- Upload zip generated at:
+  - `skills/jk-archivist-tiktok-skill/dist/jk-archivist-tiktok-skill.zip`

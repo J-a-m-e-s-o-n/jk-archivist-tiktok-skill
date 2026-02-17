@@ -10,6 +10,7 @@
     "test:python": "python3 -m unittest discover -s tests/python -p \"test_*.py\"",
     "test": "npm run test:node && npm run test:python",
     "validate:bundle": "node scripts/validate-bundle.mjs --clean",
-    "pack": "npm run validate:bundle && node scripts/pack-skill.mjs"
+    "pack": "npm run validate:bundle && node scripts/pack-skill.mjs",
+    "release": "node scripts/release.mjs"
   }
 }

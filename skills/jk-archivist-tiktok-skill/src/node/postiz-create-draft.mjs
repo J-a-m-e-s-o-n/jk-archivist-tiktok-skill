@@ -1,5 +1,13 @@
 import { requireEnv } from "./utils.mjs";
 
+export class PostizDraftError extends Error {
+  constructor(message, context = {}) {
+    super(message);
+    this.name = "PostizDraftError";
+    this.context = context;
+  }
+}
+
 function normalizeBaseUrl(rawUrl) {
   return rawUrl.replace(/\/+$/, "");
 }
@@ -17,7 +25,7 @@ export async function postizCreateDraft({
   const integrationId = requireEnv("POSTIZ_TIKTOK_INTEGRATION_ID");
 
   if (!Array.isArray(mediaRefs) || mediaRefs.length === 0) {
-    throw new Error("postizCreateDraft requires at least one uploaded media reference.");
+    throw new PostizDraftError("postizCreateDraft requires at least one uploaded media reference.");
   }
 
   const payload = {
@@ -48,7 +56,10 @@ export async function postizCreateDraft({
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Postiz draft creation failed (${response.status}): ${body}`);
+    throw new PostizDraftError(`Postiz draft creation failed (${response.status}): ${body}`, {
+      status: response.status,
+      integrationId,
+    });
   }
 
   const json = await response.json();

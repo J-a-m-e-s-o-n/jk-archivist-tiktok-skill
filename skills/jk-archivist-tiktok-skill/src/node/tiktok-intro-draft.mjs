@@ -1,16 +1,22 @@
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import { renderSlides } from "./render-slides.mjs";
 import { loadPackagerSpec } from "./packager-spec.mjs";
 import { postizUpload } from "./postiz-upload.mjs";
 import { postizCreateDraft } from "./postiz-create-draft.mjs";
 import { runPreflightChecks } from "./preflight-checks.mjs";
+import { buildCaption } from "./write-caption.mjs";
+import { preSlideRender } from "./hooks/pre-slide-render.mjs";
+import { postCaptionBuild } from "./hooks/post-caption-build.mjs";
+import { generateVariantSpecs } from "./variants/generator.mjs";
+import { createRunLogger } from "./logger.mjs";
 import {
   todayISO,
   ensureDir,
   writeText,
   writeJson,
-  optionalEnv,
   exists,
+  optionalEnv,
   repoRoot,
   join,
 } from "./utils.mjs";
@@ -76,6 +82,16 @@ function parseArgs(argv = process.argv.slice(2)) {
     dryRun: false,
     postizOnly: false,
     noUpload: false,
+    audience: undefined,
+    ctaPack: undefined,
+    hashtagPolicy: undefined,
+    hashtagOverrides: [],
+    locale: "en",
+    abTest: undefined,
+    resumeUpload: false,
+    maxRetries: 3,
+    timeoutMs: 15000,
+    verbose: false,
   };
   for (let idx = 0; idx < argv.length; idx += 1) {
     const token = argv[idx];
@@ -94,6 +110,14 @@ function parseArgs(argv = process.argv.slice(2)) {
     }
     if (token === "--no-upload") {
       args.noUpload = true;
+      continue;
+    }
+    if (token === "--resume-upload") {
+      args.resumeUpload = true;
+      continue;
+    }
+    if (token === "--verbose") {
+      args.verbose = true;
       continue;
     }
     if (token === "--spec") {
@@ -116,20 +140,95 @@ function parseArgs(argv = process.argv.slice(2)) {
       idx += 1;
       continue;
     }
+    if (token === "--audience") {
+      args.audience = argv[idx + 1];
+      idx += 1;
+      continue;
+    }
+    if (token === "--cta-pack") {
+      args.ctaPack = argv[idx + 1];
+      idx += 1;
+      continue;
+    }
+    if (token === "--hashtag-policy") {
+      args.hashtagPolicy = argv[idx + 1];
+      idx += 1;
+      continue;
+    }
+    if (token === "--hashtag") {
+      args.hashtagOverrides.push(argv[idx + 1]);
+      idx += 1;
+      continue;
+    }
+    if (token === "--locale") {
+      args.locale = argv[idx + 1];
+      idx += 1;
+      continue;
+    }
+    if (token === "--ab-test") {
+      args.abTest = argv[idx + 1];
+      idx += 1;
+      continue;
+    }
+    if (token === "--max-retries") {
+      args.maxRetries = Number.parseInt(argv[idx + 1], 10);
+      idx += 1;
+      continue;
+    }
+    if (token === "--timeout-ms") {
+      args.timeoutMs = Number.parseInt(argv[idx + 1], 10);
+      idx += 1;
+      continue;
+    }
   }
   return args;
 }
 
-async function uploadToPostiz({ caption, slidePaths, outDir }) {
+async function uploadToPostiz({
+  caption,
+  slidePaths,
+  outDir,
+  resumeUpload,
+  maxRetries,
+  timeoutMs,
+  logger,
+}) {
   const uploaded = [];
+  const uploadStatePath = join(outDir, "upload_state.json");
+  let uploadState = {
+    uploaded: [],
+  };
+  if (resumeUpload && exists(uploadStatePath)) {
+    try {
+      uploadState = JSON.parse(fs.readFileSync(uploadStatePath, "utf8"));
+    } catch {
+      uploadState = { uploaded: [] };
+    }
+  }
+
   for (const path of slidePaths) {
-    const { mediaRef, raw } = await postizUpload({ filePath: path });
+    const existing = uploadState.uploaded.find((item) => item.path === path);
+    if (existing) {
+      uploaded.push(existing);
+      logger.info("Reused uploaded slide from state", { path });
+      continue;
+    }
+    const { mediaRef, raw } = await postizUpload({
+      filePath: path,
+      maxAttempts: maxRetries,
+      timeoutMs,
+    });
     uploaded.push({ path, mediaRef, uploadResponse: raw });
+    uploadState.uploaded = uploaded;
+    writeJson(uploadStatePath, uploadState);
   }
   const draftResponse = await postizCreateDraft({
     caption,
     mediaRefs: uploaded.map((item) => item.mediaRef),
-    idempotencyKey: `${todayISO()}-${slidePaths.length}-${caption.length}`,
+    idempotencyKey: `${todayISO()}-${slidePaths.length}-${caption.length}-${slidePaths
+      .join("|")
+      .length}`,
+    timeoutMs,
   });
   const responsePath = join(outDir, "postiz_response.json");
   writeJson(responsePath, {
@@ -139,22 +238,21 @@ async function uploadToPostiz({ caption, slidePaths, outDir }) {
   return responsePath;
 }
 
-export async function runDraftFlow(cliArgs = parseArgs()) {
-  const root = repoRoot();
-  const day = todayISO();
-  const outDir = join(root, "outbox", "tiktok", "intro", day);
+async function runSingleFlow({ cliArgs, variantSpec, outDir, variantLabel, logger }) {
   const slidesDir = join(outDir, "slides");
   const captionPath = join(outDir, "caption.txt");
   const reviewDir = join(outDir, "review");
   const reviewPath = join(reviewDir, "review.md");
   const contactSheetPath = join(reviewDir, "contact_sheet.png");
+  const runLogPath = join(outDir, "run_log.json");
 
   ensureDir(slidesDir);
   ensureDir(reviewDir);
-  const packagerSpec = loadPackagerSpec(cliArgs);
-  runPreflightChecks({
-    slides: packagerSpec.slides,
-    caption: packagerSpec.caption,
+  const staged = preSlideRender({ slides: variantSpec.slides, spec: variantSpec });
+  const slides = staged.slides;
+  const diagnostics = runPreflightChecks({
+    slides,
+    caption: variantSpec.captionOverride || "temporary",
   });
 
   let slidePaths = Array.from({ length: 6 }, (_, idx) =>
@@ -166,15 +264,30 @@ export async function runDraftFlow(cliArgs = parseArgs()) {
     const renderResult = renderSlides({
       slidesDir,
       fontPath,
-      slides: packagerSpec.slides,
-      style: packagerSpec.style,
+      slides,
+      style: variantSpec.style,
       dryRun: cliArgs.dryRun,
     });
     slidePaths = renderResult.produced;
     specPath = renderResult.specPath;
   }
 
-  const caption = packagerSpec.caption;
+  const captionBase =
+    variantSpec.captionOverride ||
+    (variantSpec.template === "jk-default" &&
+    !variantSpec.topic &&
+    (!variantSpec.hashtagOverrides || variantSpec.hashtagOverrides.length === 0)
+      ? buildCaption()
+      : buildCaption({
+          template: variantSpec.template,
+          topic: variantSpec.topic,
+          slides,
+          ctaPack: variantSpec.ctaPack,
+          hashtagPolicy: variantSpec.hashtagPolicy,
+          hashtagOverrides: variantSpec.hashtagOverrides,
+          locale: variantSpec.locale,
+        }));
+  const caption = postCaptionBuild({ caption: captionBase, spec: variantSpec }).caption;
   writeText(captionPath, `${caption}\n`);
 
   writeText(
@@ -182,12 +295,15 @@ export async function runDraftFlow(cliArgs = parseArgs()) {
     [
       "# Review",
       "",
-      `Source: ${packagerSpec.source}`,
-      `Template: ${packagerSpec.template}`,
-      `Style preset: ${packagerSpec.stylePreset}`,
+      `Variant: ${variantLabel || "primary"}`,
+      `Source: ${variantSpec.source}`,
+      `Template: ${variantSpec.template}`,
+      `Style preset: ${variantSpec.stylePreset}`,
+      `Audience: ${variantSpec.audience}`,
+      `Locale: ${variantSpec.locale}`,
       "",
       "## Slides",
-      ...packagerSpec.slides.map((line, idx) => `${idx + 1}. ${line}`),
+      ...slides.map((line, idx) => `${idx + 1}. ${line}`),
       "",
       "## Caption",
       caption,
@@ -197,6 +313,10 @@ export async function runDraftFlow(cliArgs = parseArgs()) {
       `- postiz_only: ${cliArgs.postizOnly}`,
       `- upload_enabled: ${cliArgs.enablePostiz && !cliArgs.noUpload && !cliArgs.dryRun}`,
       `- spec_path: ${specPath}`,
+      `- readability_score: ${diagnostics.readability_score}`,
+      `- avg_slide_chars: ${diagnostics.avg_slide_chars}`,
+      `- max_slide_chars: ${diagnostics.max_slide_chars}`,
+      `- caption_chars: ${diagnostics.caption_chars}`,
     ].join("\n")
   );
 
@@ -214,19 +334,73 @@ export async function runDraftFlow(cliArgs = parseArgs()) {
       caption,
       slidePaths,
       outDir,
+      resumeUpload: cliArgs.resumeUpload,
+      maxRetries: cliArgs.maxRetries,
+      timeoutMs: cliArgs.timeoutMs,
+      logger,
     });
+  }
+
+  logger.flush({
+    variant: variantLabel || "primary",
+    source: variantSpec.source,
+    output_folder: outDir,
+  });
+  return {
+    outDir,
+    specPath,
+    slidePaths,
+    caption,
+    postizResponsePath,
+    runLogPath,
+    variantLabel: variantLabel || "primary",
+  };
+}
+
+export async function runDraftFlow(cliArgs = parseArgs()) {
+  const root = repoRoot();
+  const day = todayISO();
+  const baseOutDir = join(root, "outbox", "tiktok", "intro", day);
+  const packagerSpec = loadPackagerSpec(cliArgs);
+  const strategy =
+    typeof packagerSpec.abTest === "string"
+      ? packagerSpec.abTest
+      : packagerSpec.abTest?.strategy || cliArgs.abTest;
+  const variants = generateVariantSpecs(packagerSpec, strategy);
+  const results = [];
+
+  for (const variantSpec of variants) {
+    const variantOutDir =
+      variants.length > 1
+        ? join(baseOutDir, variantSpec.variantLabel || variantSpec.template)
+        : baseOutDir;
+    ensureDir(variantOutDir);
+    const logger = createRunLogger({
+      runLogPath: join(variantOutDir, "run_log.json"),
+      verbose: cliArgs.verbose,
+    });
+    logger.info("Starting variant run", {
+      variant: variantSpec.variantLabel || "primary",
+      source: variantSpec.source,
+    });
+    const result = await runSingleFlow({
+      cliArgs,
+      variantSpec,
+      outDir: variantOutDir,
+      variantLabel: variantSpec.variantLabel,
+      logger,
+    });
+    results.push(result);
   }
 
   console.log("");
   console.log("Draft generation complete.");
-  console.log(`Output folder: ${outDir}`);
-  console.log(`Slide source: ${packagerSpec.source}`);
-  console.log(`Template: ${packagerSpec.template}`);
-  console.log(`Style preset: ${packagerSpec.stylePreset}`);
-  if (cliArgs.enablePostiz && !cliArgs.noUpload && !cliArgs.dryRun) {
-    console.log(`Postiz: enabled (response written to ${postizResponsePath})`);
-  } else {
-    console.log("Postiz: skipped");
+  for (const result of results) {
+    console.log(`Output folder: ${result.outDir}`);
+    if (result.postizResponsePath) {
+      console.log(`Postiz: enabled (response written to ${result.postizResponsePath})`);
+    }
+    console.log(`Run log: ${result.runLogPath}`);
   }
 }
 

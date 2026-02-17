@@ -10,6 +10,17 @@ const BANNED_PATTERNS = [
 const MAX_SLIDE_LENGTH = 120;
 const MAX_CAPTION_LENGTH = 900;
 
+export function collectPreflightDiagnostics({ slides, caption }) {
+  const totalSlideChars = slides.reduce((sum, line) => sum + line.length, 0);
+  return {
+    avg_slide_chars: Math.round(totalSlideChars / Math.max(1, slides.length)),
+    max_slide_chars: Math.max(...slides.map((line) => line.length)),
+    caption_chars: caption.length,
+    line_length_pressure: slides.map((line) => Math.round((line.length / MAX_SLIDE_LENGTH) * 100)),
+    readability_score: Math.max(0, 100 - Math.round(totalSlideChars / 12) - slides.length * 2),
+  };
+}
+
 export function runPreflightChecks({ slides, caption }) {
   const issues = [];
 
@@ -44,4 +55,6 @@ export function runPreflightChecks({ slides, caption }) {
   if (issues.length > 0) {
     throw new Error(`Preflight check failed:\n- ${issues.join("\n- ")}`);
   }
+
+  return collectPreflightDiagnostics({ slides, caption });
 }

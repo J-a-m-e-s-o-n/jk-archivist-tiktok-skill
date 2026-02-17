@@ -45,6 +45,24 @@ Choose template/style:
 node scripts/tiktok-intro-draft.mjs --template educational --style clean
 ```
 
+Audience and caption controls:
+
+```bash
+node scripts/tiktok-intro-draft.mjs --audience expert --cta-pack engagement-focused --hashtag-policy general
+```
+
+A/B test candidates:
+
+```bash
+node scripts/tiktok-intro-draft.mjs --ab-test caption-cta
+```
+
+Dry-run / verbose:
+
+```bash
+node scripts/tiktok-intro-draft.mjs --dry-run --verbose
+```
+
 ## Optional Postiz mode
 
 Set:
@@ -57,4 +75,10 @@ Then run:
 
 ```bash
 node scripts/tiktok-intro-draft.mjs --postiz
+```
+
+Resume partial uploads (if prior run failed mid-way):
+
+```bash
+node scripts/tiktok-intro-draft.mjs --postiz --resume-upload
 ```

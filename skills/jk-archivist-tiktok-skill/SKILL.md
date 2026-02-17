@@ -47,9 +47,49 @@ Advanced modes:
 
 - `--template intro|educational|product-update|announcement`
 - `--style default|high-contrast|clean|midnight`
+- `--audience beginner|operator|expert`
+- `--cta-pack follow-focused|link-focused|engagement-focused`
+- `--hashtag-policy tcg-default|general`
+- `--locale en|es|fr`
+- `--ab-test caption-cta|style|template`
 - `--dry-run` (write spec/review only, skip render/upload)
 - `--postiz-only` (reuse existing rendered slides, upload only)
 - `--no-upload` (force local-only even with `--postiz`)
+- `--resume-upload` (resume partially uploaded runs)
+- `--max-retries <n>`
+- `--timeout-ms <n>`
+- `--verbose`
+
+Template options:
+
+- `intro`
+- `educational`
+- `product-update`
+- `announcement`
+
+Style options:
+
+- `default`
+- `high-contrast`
+- `clean`
+- `midnight`
+
+Audience options:
+
+- `beginner`
+- `operator`
+- `expert`
+
+CTA pack options:
+
+- `follow-focused`
+- `link-focused`
+- `engagement-focused`
+
+Hashtag policy options:
+
+- `tcg-default`
+- `general`
 
 ## Core Output Contract
 
@@ -62,22 +102,32 @@ Expected layout:
 
 ```text
 outbox/tiktok/intro/YYYY-MM-DD/
+  _slide_spec.json
+  _render_metadata.json
   slides/slide_01.png ... slide_06.png
   caption.txt
-  postiz_response.json (optional, later phase)
+  review/review.md
+  review/contact_sheet.png
+  run_log.json
+  upload_state.json (optional)
+  postiz_response.json (optional)
 ```
 
 ## What Can Be Customized
 
 - Slide text (any 6-line narrative)
 - Font via `TIKTOK_FONT_PATH`
-- Caption text template per campaign
-- Downstream posting target (future phase integrations)
+- Caption behavior via template + CTA + hashtags
+- Audience mode and localization
+- A/B variant strategy
+- Optional Postiz upload controls
 
 To customize for your use case, change:
 
 - The `slides` array content (via `--spec` JSON or topic mode)
 - The caption template in `src/node/write-caption.mjs`
+- Hashtag/CTA policy in `src/node/hashtags` and `src/node/cta`
+- Audience adaptation in `src/node/audience`
 - Optional Postiz env vars if enabling `--postiz`
 
 Spec format:
@@ -91,7 +141,20 @@ Spec format:
     "Slide line 4",
     "Slide line 5",
     "Slide line 6"
-  ]
+  ],
+  "caption": "Optional caption override",
+  "template": "intro",
+  "audience": "operator",
+  "ctaPack": "follow-focused",
+  "hashtagPolicy": "tcg-default",
+  "hashtagOverrides": ["#customtag"],
+  "locale": "en",
+  "ab_test": {
+    "strategy": "caption-cta"
+  },
+  "style": {
+    "preset": "default"
+  }
 }
 ```
 
@@ -103,8 +166,16 @@ Spec format:
 | Generate deterministic copy from a topic | `--topic "your topic"` |
 | Use a built-in narrative structure | `--template educational` (or others) |
 | Change visual style | `--style high-contrast` |
+| Adjust reading complexity for target viewers | `--audience beginner|operator|expert` |
+| Change CTA behavior | `--cta-pack ...` |
+| Apply hashtag policy | `--hashtag-policy ...` |
+| Add custom hashtags | `--hashtag #customtag` (repeatable) |
+| Localize CTA text | `--locale es` |
+| Generate multiple candidates | `--ab-test caption-cta|style|template` |
 | Keep local-only output | run without `--postiz` or add `--no-upload` |
 | Upload optional draft via Postiz | `--postiz` with required env vars |
+| Resume partial uploads | `--postiz --resume-upload` |
+| Tune network/upload behavior | `--max-retries N --timeout-ms N` |
 | Validate pipeline without rendering/upload | `--dry-run` |
 
 ## Preset: JK Archivist Intro (Exact Contract)
@@ -143,6 +214,18 @@ Follow if you want collector-first market intelligence. 👑🧱
 - No predictions
 - No copyrighted character art
 - No unverified superlatives (e.g., "guaranteed", "most accurate")
+
+## Required/Optional Environment Variables
+
+Required for optional upload mode:
+
+- `POSTIZ_API_KEY`
+- `POSTIZ_TIKTOK_INTEGRATION_ID`
+
+Optional:
+
+- `POSTIZ_BASE_URL` (defaults to `https://api.postiz.com/public/v1`)
+- `TIKTOK_FONT_PATH` (absolute `.ttf` path)
 
 ## References
 

@@ -1,11 +1,13 @@
 import fs from "node:fs";
-import { buildCaption } from "./write-caption.mjs";
 import {
   DEFAULT_SLIDES,
   validateSlides,
   resolveSlides,
   listTemplates,
 } from "./slide-copy.mjs";
+import { resolveAudienceMode, adaptSlidesForAudience } from "./audience/adapt-content.mjs";
+import { resolveCtaPack } from "./cta/packs.mjs";
+import { resolveHashtagPolicy } from "./hashtags/policy.mjs";
 
 export const STYLE_PRESETS = {
   default: {
@@ -69,57 +71,94 @@ function resolveTemplate(templateName) {
   return templateName;
 }
 
+function resolveLocale(locale) {
+  if (!locale) return "en";
+  if (!["en", "es", "fr"].includes(locale)) {
+    throw new Error(`Unknown locale '${locale}'. Allowed: en, es, fr`);
+  }
+  return locale;
+}
+
 export function loadPackagerSpec(cliArgs) {
   const template = resolveTemplate(cliArgs.template);
   const stylePreset = resolveStylePreset(cliArgs.stylePreset);
+  const audience = resolveAudienceMode(cliArgs.audience);
+  const ctaPack = resolveCtaPack(cliArgs.ctaPack);
+  const hashtagPolicy = resolveHashtagPolicy(cliArgs.hashtagPolicy);
+  const locale = resolveLocale(cliArgs.locale);
+  const hashtagOverrides = Array.isArray(cliArgs.hashtagOverrides) ? cliArgs.hashtagOverrides : [];
 
   // Precedence: --spec > --topic > --template > default preset.
   if (cliArgs.specPath) {
     const raw = loadJsonFile(cliArgs.specPath);
-    const slides = validateSlides(raw.slides, `Spec (${cliArgs.specPath})`);
-    const caption = typeof raw.caption === "string" ? raw.caption.trim() : buildCaption();
+    const slides = adaptSlidesForAudience(
+      validateSlides(raw.slides, `Spec (${cliArgs.specPath})`),
+      raw.audience || audience
+    );
     const styleName = resolveStylePreset(raw?.style?.preset || stylePreset);
     return {
       slides,
-      caption,
       template: raw.template || template,
       stylePreset: styleName,
       style: STYLE_PRESETS[styleName],
+      audience: raw.audience || audience,
+      ctaPack: raw.ctaPack || ctaPack,
+      hashtagPolicy: raw.hashtagPolicy || hashtagPolicy,
+      hashtagOverrides: raw.hashtagOverrides || hashtagOverrides,
+      locale: resolveLocale(raw.locale || locale),
+      captionOverride: typeof raw.caption === "string" ? raw.caption.trim() : undefined,
+      abTest: raw.ab_test || cliArgs.abTest,
       source: `spec:${cliArgs.specPath}`,
     };
   }
 
   if (cliArgs.topic) {
     const topic = assertString(cliArgs.topic, "--topic");
-    const slides = resolveSlides({ topic, template });
+    const slides = adaptSlidesForAudience(resolveSlides({ topic, template }), audience);
     return {
       slides,
-      caption: buildCaption(),
       template,
       stylePreset,
       style: STYLE_PRESETS[stylePreset],
+      topic,
+      audience,
+      ctaPack,
+      hashtagPolicy,
+      hashtagOverrides,
+      locale,
+      abTest: cliArgs.abTest,
       source: `topic:${topic}`,
     };
   }
 
   if (cliArgs.template) {
-    const slides = resolveSlides({ template });
+    const slides = adaptSlidesForAudience(resolveSlides({ template }), audience);
     return {
       slides,
-      caption: buildCaption(),
       template,
       stylePreset,
       style: STYLE_PRESETS[stylePreset],
+      audience,
+      ctaPack,
+      hashtagPolicy,
+      hashtagOverrides,
+      locale,
+      abTest: cliArgs.abTest,
       source: `template:${template}`,
     };
   }
 
   return {
-    slides: [...DEFAULT_SLIDES],
-    caption: buildCaption(),
+    slides: adaptSlidesForAudience([...DEFAULT_SLIDES], audience),
     template: "jk-default",
     stylePreset: "default",
     style: STYLE_PRESETS.default,
+    audience,
+    ctaPack,
+    hashtagPolicy,
+    hashtagOverrides,
+    locale,
+    abTest: cliArgs.abTest,
     source: "preset:jk-default",
   };
 }
